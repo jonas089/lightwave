@@ -1,10 +1,12 @@
 use anyhow::{Context, Result};
 use helios_ethereum::rpc::ConsensusRpc;
-use helios_operator::{get_checkpoint, get_client, get_updates};
 use serde_json::Value;
 use sp1_helios_primitives::types::ProofInputs;
 use std::env;
 use tracing::info;
+
+use crate::preprocessor::helios::{get_checkpoint, get_client, get_updates};
+mod helios;
 mod helpers;
 
 /// Type alias for the serialized Helios program inputs
@@ -92,13 +94,4 @@ pub async fn get_latest_finalized_slot() -> Result<u64> {
 
     let slot = slot_str.parse::<u64>()?;
     Ok(slot)
-}
-
-/// Test function to print the latest finalized slot.
-///
-/// This is used for debugging and testing purposes.
-#[tokio::test]
-async fn test_print_latest_finalized_slot() {
-    let slot = get_latest_finalized_slot().await.unwrap();
-    println!("Latest finalized slot: {}", slot);
 }

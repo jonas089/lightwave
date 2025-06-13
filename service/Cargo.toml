@@ -24,6 +24,7 @@ recursion-types.workspace = true
 tree_hash = "0.9.0"
 borsh.workspace = true
 hex = "0.4"
+alloy-primitives.workspace = true
 alloy-sol-types.workspace = true
 rusqlite = "=0.28.0"
 axum = "0.8.4"
