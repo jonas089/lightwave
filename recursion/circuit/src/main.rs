@@ -17,7 +17,7 @@ const TRUSTED_SYNC_COMMITTEE_HASH: [u8; 32] = [42, 127, 126, 117, 72, 179, 28, 1
 // The trusted slot number from which we start our light client chain.
 // This must be a slot where we have verified the sync committee hash.
 const TRUSTED_HEAD: u64 = 11715392;
-const HELIOS_VK: &str = "0x00e8ef401d89cf6c4698607644e75f1871724d56f7374972a6a5b76d3cdaf81e";
+const HELIOS_VK: &str = "0x00cd47e188eeeab95c3c666088b928ff8243f8dd8d6e94f49795013bcd6231f0";
 
 pub fn main() {
     // Deserialize the circuit inputs which contain the Helios proof and previous wrapper proof
