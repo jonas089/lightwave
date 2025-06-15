@@ -6359,7 +6359,7 @@ dependencies = [
  "serde",
  "serde_cbor",
  "serde_json",
- "sp1-build 4.1.7",
+ "sp1-build",
  "sp1-helios-primitives",
  "sp1-helios-script",
  "sp1-sdk",
@@ -6537,18 +6537,6 @@ dependencies = [
  "log",
  "rand 0.8.5",
  "sha-1",
-]
-
-[[package]]
-name = "sp1-build"
-version = "4.1.7"
-source = "git+https://github.com/timewave-computer/sp1?branch=jonas%2Ffix-4.1.7-syscall#bc6c56a95d8ec60e0ade98c589114f4b2f1aa8d8"
-dependencies = [
- "anyhow",
- "cargo_metadata",
- "chrono",
- "clap",
- "dirs",
 ]
 
 [[package]]
@@ -6738,7 +6726,7 @@ dependencies = [
  "serde",
  "serde_cbor",
  "serde_json",
- "sp1-build 5.0.0",
+ "sp1-build",
  "sp1-helios-primitives",
  "sp1-sdk",
  "tokio",
@@ -6986,7 +6974,7 @@ dependencies = [
  "reqwest-middleware",
  "serde",
  "serde_json",
- "sp1-build 5.0.0",
+ "sp1-build",
  "sp1-core-executor",
  "sp1-core-machine",
  "sp1-cuda",
@@ -7049,7 +7037,7 @@ dependencies = [
  "hex",
  "lazy_static",
  "sha2 0.10.8",
- "sp1-build 5.0.0",
+ "sp1-build",
  "substrate-bn-succinct",
  "thiserror 2.0.12",
 ]
