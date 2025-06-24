@@ -1,122 +1,75 @@
-# SP1-Helios ZK Light-Client operator for Valence
-This repository contains a ZK prover that generates and submits SP1-Helios light client proofs
-to our coprocessor. The service maintains a chain of proofs that verify the execution state
-of the Ethereum network, committing both the execution block height and state root for each
-verified block.
+# Lightwave: Recursive ZK Light Clients in Rust
 
-# (Re-)Initialization
-Most Light Clients (Lodestar, Nimbus, ...) don't maintain the full finality proof history for all slots.
-Because of this we have a fallback / re-initialization strategy, that we can use in case our prover goes 
-down for an extended period (25 hours +).
+An extensible, recursive, ZK light client operator service that currently supports both Ethereum (via Helios) and Tendermint chains. This service generates and verifies zero-knowledge proofs of light client state transitions, enabling trustless verification of blockchain state.
 
-In order to leverage the strategy, run the following sequence of commands:
+## Documentation
 
-```shell
-make build-circuits SLOT=NEW_TRUSTED_SLOT_NUMBER
-```
+- [Helios Documentation](docs/integrations/HELIOS.md) - Documentation for the Ethereum light client implementation
+- [Tendermint Documentation](docs/integrations/TENDERMINT.md) - Documentation for the Tendermint light client implementation
 
-> [!NOTE]
-> It is extremely important to dump the latest elf before generating the circuits.
-> If you use the wrong elfs for the circuit generation, then the vks might be invalid
-> and proof verification might fail.
+## Features
 
+- Support for both Ethereum and Tendermint light clients
+- Recursive proof verification
+- State persistence
+- REST API for proof retrieval
+- Configurable trusted checkpoints
+- Automatic proof generation and verification
 
-To start the service:
-```shell
-make run
-```
+## Makefile Commands
 
-To continue an existing service with a valid state db:
-```shell
-make continue
-```
+The project provides several Makefile commands for different use cases:
 
-# Technicalities (low-level)
+### `make build-circuits`
+**One-time setup command** - Generates the ZK circuits and ELF files needed for proof generation and verification. This command:
+- Deletes existing state
+- Generates recursive circuits for both Helios and Tendermint
+- Dumps ELF files to `elfs/variable/`
+- Generates wrapper circuits
+- Dumps final ELF files
 
-## What is the `Period distance`? 
-Every 32 slots an epoch ends. A new period (=sync committee rotation) happens every 256 epochs (=8192) slots.
-In order to compute the next ZK Light-Client update we must calculate the period diff from the new head to our
-trusted beacon block.
+> [!NOTE] 
+> This command should only be run once per deployment. Running it on different machines or
+> after circuit code modifications will produce new ELF files that won't match previously 
+> generated ones, potentially leading to invalid proofs.
 
-# System Architecture
-The system consists of three main components that work together to provide ZK light client proofs:
+### `make run`
+**Fresh start from hardcoded checkpoint** - Starts the service with a clean slate. This command:
+- **Deletes the database** and all existing state
+- Starts proving from the first checkpoint all the way to the current head
+- Initializes new state based on the trusted checkpoints in `crates/service/src/checkpoints.rs`
 
-## Preprocessor
-The preprocessor is responsible for preparing the serialized circuit inputs for the Helios program. It:
-- Takes a trusted slot as input
-- Fetches the latest finalized slot from the consensus layer
-- Calculates the period distance between slots
-- Gathers necessary updates and finality data
-- Serializes all inputs for the Helios program
+> [!WARNING]
+> This command will **prune the database** and restart proof generation from the beginning. 
+> Use this only when you want to completely reset the service state.
 
-## Service
-The service is the main orchestrator that:
-- Calls the Helios prover to generate proofs
-- Implements recursive proof verification
-- Maintains state of the most recent recursive proof
-- In the first round, verifies only the proof at the trusted height
-- In subsequent rounds, verifies both the current Helios proof and the previous recursive proof
-- Updates its state with each new recursive proof
-- Commits execution block height and state root for each verified block
+### `make continue`
+**Resume prover** - Continues the service from where it left off. This command:
+- Loads existing state from the database
+- Continues proof generation from the last processed checkpoint
+- Preserves all previously generated proofs and state
 
-## SP1-Helios
-This service depends on [SP1-Helios](https://github.com/succinctlabs/sp1-helios). SP1-Helios is an Ethereum ZK Light Client that can be used
-to cryptographically prove the correctness of the consensus protocol. The goal is to obtain trusted roots for a given block so that we can
-verify state and events that occurred within that block, without having to trust an external service (relayer).
+> 💡 **Recommended**: Use this command for normal operation and after service restarts.
 
-## Recursion
-The recursion crate contains the circuit code that:
-- Verifies Helios proof
-- Implements the recursive verification logic
-- Ensures the chain of proofs is valid and connected
-- Maintains the security properties of the light client protocol
-- Verifies the execution state root and block height for each block
+## Getting Started
 
-## Wrapper
-The wrapper crate contains the circuit code that:
-- Verifies the Recursion proof
-- Commits the same public outputs as the Recursion proof
+1. Set the environment variable `CLIENT_BACKEND` to either `"HELIOS"` or `"TENDERMINT"` to choose which light client to use
+2. Follow the initialization instructions in the respective documentation:
+   - [Helios Initialization](docs/integrations/HELIOS.md#re-initialization)
+   - [Tendermint Initialization](docs/integrations/TENDERMINT.md#re-initialization)
+3. Specify the trusted checkpoint for your chosen light client in `crates/service/src/checkpoints.rs`:
+   - For Helios: Update `HELIOS_TRUSTED_SLOT` with the desired slot number
+   - For Tendermint: Update `TENDERMINT_TRUSTED_HEIGHT` and `TENDERMINT_TRUSTED_ROOT` with the desired height and root hash
+4. **First time setup**: Run `make build-circuits` to generate the required circuits and ELF files
+5. **Start the service**: 
+   - For fresh start: `make run` (⚠️ **prunes database**)
+   - For normal operation: `make continue`
 
-The Wrapper circuit is necessary because we cannot recursively verify the same circuit within itself - this would require deriving the verifying key inside the circuit, which is not possible. Instead, we use a separate wrapper circuit that verifies the recursive proof and maintains the same security properties.
+## Architecture
 
-## Verification Logic
-In order to be able to generate the first valid proof using our circuit, one has to obtain a valid Helios proof for our trusted checkpoint.
-The trusted checkpoint is a pair of Root, Slot that we know is valid and this is the only trust assumption in the protocol.
+The service consists of several key components:
 
-Moving forward every new proof will be verified against a valid previous proof, e.g. we always have to make a transition from one of the previous
-valid Helios checkpoints to a new checkpoint.
-
-For our Valence MVP we expose only the execution state root and block height, because that is all we need to verify stored values in Smart Contracts on Ethereum.
-Later we can expose other roots like the beacon header root (default for Helios) or the root of the receipts tree.
-
-## Circuit Inputs and Outputs
-
-### Recursion Circuit
-| Input | Description |
-|-------|-------------|
-| `electra_body_roots` | Merkle roots of the Electra block body components |
-| `electra_header` | Electra block header containing slot, proposer index, and roots |
-| `helios_proof` | Proof generated by the Helios circuit |
-| `helios_public_values` | Public values from the Helios proof |
-| `helios_vk` | Verification key for the Helios circuit |
-| `previous_wrapper_proof` | Optional previous wrapper proof for recursive verification |
-| `previous_wrapper_public_values` | Optional public values from previous wrapper proof |
-| `previous_wrapper_vk` | Optional verification key for previous wrapper proof |
-| `previous_head` | Slot number of the previous head |
-
-| Output | Description |
-|--------|-------------|
-| `root` | Execution state root |
-| `height` | Execution block height |
-
-### Wrapper Circuit
-| Input | Description |
-|-------|-------------|
-| `recursive_proof` | Proof generated by the Recursion circuit |
-| `recursive_public_values` | Public values from the Recursion proof |
-| `recursive_vk` | Verification key for the Recursion circuit |
-
-| Output | Description |
-|--------|-------------|
-| `root` | Execution state root (same as Recursion circuit) |
-| `height` | Execution block height (same as Recursion circuit) |
+- **Service**: Main orchestrator that manages proof generation and verification
+- **Preprocessor**: Prepares inputs for the light client programs
+- **Recursion Circuit**: Verifies light client proofs and maintains proof chain
+- **Wrapper Circuit**: Verifies recursive proofs and commits outputs
